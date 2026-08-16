@@ -41,14 +41,14 @@ TASK_SEGMENT = "Segmentation"
 TASK_WORLD = "YOLO World v2 (Text Prompt)"
 TASK_YOLOE = "YOLOE (Text → Segmentation)"
 TASK_POSE = "Pose Estimation"
-TASKS_LIST = [TASK_DETECT, TASK_SEGMENT, TASK_WORLD, TASK_YOLOE, TASK_POSE]
+TASKS_LIST = [TASK_DETECT]
 
 # ─── Video Sources ───────────────────────────────────────────────────────────
 SOURCE_STORED = "Stored Video"
 SOURCE_WEBCAM = "Webcam"
 SOURCE_RTSP = "RTSP Stream"
 SOURCE_YOUTUBE = "YouTube"
-VIDEO_SOURCES = [SOURCE_STORED, SOURCE_WEBCAM, SOURCE_RTSP, SOURCE_YOUTUBE]
+VIDEO_SOURCES = [SOURCE_STORED, SOURCE_YOUTUBE]
 
 # ─── Model Catalog ────────────────────────────────────────────────────────────
 # Each task has a dict of {display_label: model_filename}.
@@ -56,42 +56,17 @@ VIDEO_SOURCES = [SOURCE_STORED, SOURCE_WEBCAM, SOURCE_RTSP, SOURCE_YOUTUBE]
 
 DETECTION_MODELS = {
     "Indian Vehicle Detector": "indian_vehicle_yolo11n.pt",
-    "YOLO26-nano (fastest)": "yolo26n.pt",
-    "YOLO26-small": "yolo26s.pt",
-    "YOLO26-xlarge (best accuracy)": "yolo26x.pt",
-    "RT-DETR-XLarge (transformer)": "rtdetr-x.pt"
-}
+    "YOLO26-nano (COCO, general)": "yolo26n.pt",
+   }
 
-SEGMENTATION_MODELS = {
-    "YOLO26-nano-seg (fastest)": "yolo26n-seg.pt",
-    "YOLO26-small-seg": "yolo26s-seg.pt",
-    "YOLO26-medium-seg": "yolo26m-seg.pt",
-    "YOLO26-large-seg": "yolo26l-seg.pt",
-    "YOLO26-xlarge-seg (best accuracy)": "yolo26x-seg.pt",
-}
+# Unused (app is detection-only); kept minimal so cross-file references stay valid.
+SEGMENTATION_MODELS = {"YOLO26-nano-seg": "yolo26n-seg.pt"}
 
-POSE_MODELS = {
-    "YOLO26-nano-pose (fastest)": "yolo26n-pose.pt",
-    "YOLO26-small-pose": "yolo26s-pose.pt",
-    "YOLO26-medium-pose": "yolo26m-pose.pt",
-    "YOLO26-large-pose": "yolo26l-pose.pt",
-    "YOLO26-xlarge-pose (best accuracy)": "yolo26x-pose.pt",
-}
+POSE_MODELS = {"YOLO26-nano-pose": "yolo26n-pose.pt"}
 
-WORLD_MODELS = {
-    "YOLOv8-small-worldv2": "yolov8s-worldv2.pt",
-    "YOLOv8-medium-worldv2": "yolov8m-worldv2.pt",
-    "YOLOv8-large-worldv2 (recommended)": "yolov8l-worldv2.pt",
-    "YOLOv8-xlarge-worldv2 (best accuracy)": "yolov8x-worldv2.pt",
-}
+WORLD_MODELS = {"YOLOv8-large-worldv2": "yolov8l-worldv2.pt"}
 
-YOLOE_MODELS = {
-    "YOLOE-26n-seg (fastest)": "yoloe-26n-seg.pt",
-    "YOLOE-26s-seg": "yoloe-26s-seg.pt",
-    "YOLOE-26m-seg": "yoloe-26m-seg.pt",
-    "YOLOE-26l-seg (recommended)": "yoloe-26l-seg.pt",
-    "YOLOE-26x-seg (best accuracy)": "yoloe-26x-seg.pt",
-}
+YOLOE_MODELS = {"YOLOE-26l-seg": "yoloe-26l-seg.pt"}
 
 # Defaults (first key in each dict)
 DETECTION_MODEL = "indian_vehicle_yolo11n.pt"
