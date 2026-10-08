@@ -1,5 +1,5 @@
 """
-Image inference service — Detection, Segmentation, YOLO World & Pose.
+Image inference service — vehicle object detection.
 
 Provides a single ``render()`` entry-point called from *app.py*.
 """
@@ -18,21 +18,10 @@ from model_loader import get_model_for_task
 
 
 def render(task: str, confidence: float, selected_model: str | None = None) -> None:
-    """Render the full image-inference page for the chosen *task*."""
+    """Render the image-inference page for the chosen *task*."""
     st.header(f"📷 Image · {task}")
 
-    # YOLO World / YOLOE need a text prompt before anything else
-    world_classes: list[str] | None = None
-    if task == config.TASK_WORLD:
-        world_classes = _world_class_input()
-        if not world_classes:
-            return
-    elif task == config.TASK_YOLOE:
-        world_classes = _yoloe_class_input()
-        if not world_classes:
-            return
-
-    model = get_model_for_task(task, world_classes, model_name=selected_model)
+    model = get_model_for_task(task, model_name=selected_model)
     if model is None:
         return
 
@@ -67,57 +56,6 @@ def render(task: str, confidence: float, selected_model: str | None = None) -> N
             )
 
 
-# ── YOLOE helpers ─────────────────────────────────────────────────────────────
-
-
-def _yoloe_class_input() -> list[str] | None:
-    """Show a text-area for the user to type category-level object classes."""
-    st.markdown(
-        "💡 **Tip**: YOLOE supports **category-level** labels like `person`, `car`, `dog`. "
-        "It does **NOT** support descriptive phrases like *person in red shirt*. "
-        "Results include both bounding boxes **and** segmentation masks."
-    )
-    text = st.text_area(
-        "🔍 Enter object categories to detect & segment (comma-separated)",
-        value=config.DEFAULT_YOLOE_CLASSES,
-        help=(
-            "YOLOE performs open-vocabulary detection + instance segmentation. "
-            "Use simple category names only (e.g. person, car, laptop)."
-        ),
-    )
-    classes = [c.strip() for c in text.split(",") if c.strip()]
-    if classes:
-        st.info(f"🎯 Detecting & segmenting: **{', '.join(classes)}**")
-    else:
-        st.warning("⚠️ Please enter at least one object category.")
-    return classes or None
-
-
-# ── YOLO World helpers ────────────────────────────────────────────────────────
-
-
-def _world_class_input() -> list[str] | None:
-    """Show a text-area for the user to type object classes / descriptive prompts."""
-    st.markdown(
-        "💡 **Tip**: YOLO World v2 supports natural language prompts! "
-        "Try descriptive phrases like `person in black`, `red car`, `wooden chair`."
-    )
-    text = st.text_area(
-        "🔍 Enter object classes or descriptions (comma-separated)",
-        value=config.DEFAULT_WORLD_CLASSES,
-        help=(
-            "YOLO World v2 performs open-vocabulary detection based on your text prompt. "
-            "You can use simple class names OR descriptive phrases."
-        ),
-    )
-    classes = [c.strip() for c in text.split(",") if c.strip()]
-    if classes:
-        st.info(f"🎯 Detecting: **{', '.join(classes)}**")
-    else:
-        st.warning("⚠️ Please enter at least one class to detect.")
-    return classes or None
-
-
 # ── Inference logic ───────────────────────────────────────────────────────────
 
 
@@ -129,20 +67,18 @@ def _run_inference(model, image: PIL.Image.Image, confidence: float, task: str) 
         annotated = result.plot()[:, :, ::-1]  # BGR → RGB
         st.image(annotated, caption=f"{task} Result", width="stretch")
 
-    _display_results(result, task)
+    _display_results(result)
 
 
-def _display_results(result, task: str) -> None:
-    """Show structured results below the annotated image."""
+def _display_results(result) -> None:
+    """Show structured detection results below the annotated image."""
     with st.expander("📊 Results", expanded=True):
-
-        # ── Boxes (Detection / Segmentation / World) ──────────────────────
         if result.boxes is not None and len(result.boxes):
             names = result.names
             classes = result.boxes.cls.cpu().numpy()
             confs = result.boxes.conf.cpu().numpy()
 
-            # Summary metrics
+            # Summary metrics (count + avg confidence per class)
             summary: dict[str, dict] = {}
             for cls_id, conf in zip(classes, confs):
                 name = names[int(cls_id)]
@@ -165,21 +101,5 @@ def _display_results(result, task: str) -> None:
                 for c, cf in zip(classes, confs)
             ]
             st.dataframe(pd.DataFrame(rows), width="stretch")
-
-        # ── Keypoints (Pose) ──────────────────────────────────────────────
-        if task == config.TASK_POSE:
-            kp = getattr(result, "keypoints", None)
-            if kp is not None and len(kp):
-                st.success(f"✅ Detected **{len(kp)}** pose(s)")
-            else:
-                st.info("No poses detected — try lowering the confidence threshold.")
-
-        # ── Masks (Segmentation / YOLOE) ──────────────────────────────────
-        if task in (config.TASK_SEGMENT, config.TASK_YOLOE):
-            masks = getattr(result, "masks", None)
-            if masks is not None and len(masks):
-                st.success(f"✅ Segmented **{len(masks)}** object(s)")
-
-        # ── Empty state ───────────────────────────────────────────────────
-        if result.boxes is None or len(result.boxes) == 0:
+        else:
             st.info("No objects detected. Try lowering the confidence threshold.")

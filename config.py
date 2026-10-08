@@ -1,10 +1,9 @@
 """
-Configuration hub for YOLO Vision Studio.
-All paths, model configs, UI settings, and constants are defined here.
+Configuration hub for the Vehicle Detection & Tracking app.
+All paths, model config, UI settings, and constants are defined here.
 """
 
 from pathlib import Path
-import os
 import sys
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -22,12 +21,12 @@ WEIGHTS_DIR = ROOT / "weights"
 WEIGHTS_DIR.mkdir(exist_ok=True)
 
 # ─── App Metadata ────────────────────────────────────────────────────────────
-APP_TITLE = "YOLO Vision Studio"
-APP_ICON = "🔬"
-APP_VERSION = "2.1.0"
+APP_TITLE = "Vehicle Detection & Tracking"
+APP_ICON = "🚗"
+APP_VERSION = "1.0.0"
 APP_DESCRIPTION = (
-    "Real-time Object Detection, Segmentation, Pose Estimation & Tracking "
-    "powered by YOLO26, YOLO World v2, RT-DETR & Streamlit"
+    "Object detection and multi-object tracking for 6 vehicle classes, "
+    "powered by a custom fine-tuned YOLO11n model."
 )
 
 # ─── Inference Modes ─────────────────────────────────────────────────────────
@@ -37,47 +36,23 @@ MODES_LIST = [MODE_IMAGE, MODE_VIDEO]
 
 # ─── Tasks ───────────────────────────────────────────────────────────────────
 TASK_DETECT = "Detection"
-TASK_SEGMENT = "Segmentation"
-TASK_WORLD = "YOLO World v2 (Text Prompt)"
-TASK_YOLOE = "YOLOE (Text → Segmentation)"
-TASK_POSE = "Pose Estimation"
 TASKS_LIST = [TASK_DETECT]
 
 # ─── Video Sources ───────────────────────────────────────────────────────────
 SOURCE_STORED = "Stored Video"
-SOURCE_WEBCAM = "Webcam"
-SOURCE_RTSP = "RTSP Stream"
 SOURCE_YOUTUBE = "YouTube"
 VIDEO_SOURCES = [SOURCE_STORED, SOURCE_YOUTUBE]
 
 # ─── Model Catalog ────────────────────────────────────────────────────────────
-# Each task has a dict of {display_label: model_filename}.
-# Ultralytics auto-downloads any model not already in weights/.
-
+# {display_label: model_filename}. Bare filenames — resolve_model_path() adds
+# the weights/ prefix. Ultralytics auto-downloads any model not already present.
 DETECTION_MODELS = {
     "Indian Vehicle Detector": "indian_vehicle_yolo11n.pt",
     "YOLO26-nano (COCO, general)": "yolo26n.pt",
-   }
+}
 
-# Unused (app is detection-only); kept minimal so cross-file references stay valid.
-SEGMENTATION_MODELS = {"YOLO26-nano-seg": "yolo26n-seg.pt"}
-
-POSE_MODELS = {"YOLO26-nano-pose": "yolo26n-pose.pt"}
-
-WORLD_MODELS = {"YOLOv8-large-worldv2": "yolov8l-worldv2.pt"}
-
-YOLOE_MODELS = {"YOLOE-26l-seg": "yoloe-26l-seg.pt"}
-
-# Defaults (first key in each dict)
+# Default model filename
 DETECTION_MODEL = "indian_vehicle_yolo11n.pt"
-SEGMENTATION_MODEL = "yolo26n-seg.pt"
-POSE_MODEL = "yolo26n-pose.pt"
-
-# YOLO World v2: open-vocabulary detection via natural language text prompts
-YOLO_WORLD_MODEL = "yolov8l-worldv2.pt"
-
-# YOLOE: open-vocabulary text-prompted detection + segmentation
-YOLOE_MODEL = "yoloe-26l-seg.pt"
 
 # ─── Default Assets ──────────────────────────────────────────────────────────
 DEFAULT_IMAGE = IMAGES_DIR / "office_4.jpg"
@@ -107,7 +82,6 @@ DEFAULT_IOU = 0.50
 MIN_CONFIDENCE = 10  # slider min (%)
 MAX_CONFIDENCE = 100  # slider max (%)
 VIDEO_DISPLAY_WIDTH = 720
-WEBCAM_PATH = 0
 
 # ─── Skip Frames ─────────────────────────────────────────────────────────────
 DEFAULT_SKIP_FRAMES = 1  # process every frame
@@ -118,15 +92,6 @@ MAX_SKIP_FRAMES = 8
 TRACKER_BYTETRACK = "bytetrack.yaml"
 TRACKER_BOTSORT = "botsort.yaml"
 TRACKERS_LIST = [TRACKER_BYTETRACK, TRACKER_BOTSORT]
-
-# ─── YOLO World v2 Defaults ───────────────────────────────────────────────────
-# Supports natural language prompts like "person in black", "red car", etc.
-DEFAULT_WORLD_CLASSES = "person, car, dog, cat, chair, table, laptop, phone"
-
-# ─── YOLOE Defaults ──────────────────────────────────────────────────────────
-# YOLOE supports category-level text prompts (NOT descriptive phrases).
-# Unlike YOLO World v2, YOLOE provides detection + segmentation masks.
-DEFAULT_YOLOE_CLASSES = "person, car, dog, cat, chair, table, laptop, phone"
 
 
 def resolve_model_path(model_name: str) -> str:
@@ -156,12 +121,8 @@ def sweep_stray_weights() -> None:
 
 
 def get_model_catalog(task: str) -> dict[str, str]:
-    """Return ``{display_label: filename}`` for the given *task*."""
-    _CATALOGS = {
-        TASK_DETECT: DETECTION_MODELS,
-        TASK_SEGMENT: SEGMENTATION_MODELS,
-        TASK_POSE: POSE_MODELS,
-        TASK_WORLD: WORLD_MODELS,
-        TASK_YOLOE: YOLOE_MODELS,
-    }
-    return _CATALOGS.get(task, DETECTION_MODELS)
+    """Return ``{display_label: filename}`` for the given *task*.
+
+    The app is detection-only, so this always returns the detection catalog.
+    """
+    return DETECTION_MODELS

@@ -1,14 +1,13 @@
 """
-Video inference service — Stored videos, Webcam, RTSP & YouTube.
+Video inference service — stored videos & YouTube.
 
 Features
 --------
-* Object detection, segmentation, YOLO World v2 & pose estimation
+* Vehicle object detection
 * ByteTrack / BoTSORT tracking with per-box track IDs (class | conf | ID:N)
 * Local (per-frame) + Global (cumulative) tracking metrics
 * Skip-frames slider for faster inferencing
 * Multi-video simultaneous detection in side-by-side columns
-* Browser-based webcam via streamlit-webrtc
 """
 
 from __future__ import annotations
@@ -62,19 +61,8 @@ def _annotate_with_ids(
     font_scale: float = 0.50,
     box_thickness: int = 2,
 ) -> np.ndarray:
-    """Draw bounding boxes with ``class | conf% | ID:N`` labels.
-
-    For segmentation / pose tasks, masks / keypoints are rendered first
-    via ``result.plot(labels=False, boxes=False)`` then custom box
-    labels with track IDs are overlaid.
-    """
-    has_masks = getattr(result, "masks", None) is not None and len(result.masks)
-    has_kpts = getattr(result, "keypoints", None) is not None and len(result.keypoints)
-
-    if has_masks or has_kpts:
-        annotated = result.plot(labels=False, boxes=False, conf=False)
-    else:
-        annotated = frame.copy()
+    """Draw bounding boxes with ``class | conf% | ID:N`` labels."""
+    annotated = frame.copy()
 
     if result.boxes is None or len(result.boxes) == 0:
         return annotated
@@ -145,21 +133,10 @@ def _frame_to_bytes(frame: np.ndarray) -> bytes:
 
 
 def render(task: str, confidence: float, selected_model: str | None = None) -> None:
-    """Render the full video-inference page for the chosen *task*."""
+    """Render the video-inference page for the chosen *task*."""
     st.header(f"🎬 Video · {task}")
 
-    # YOLO World / YOLOE text prompt
-    world_classes: list[str] | None = None
-    if task == config.TASK_WORLD:
-        world_classes = _world_class_input()
-        if not world_classes:
-            return
-    elif task == config.TASK_YOLOE:
-        world_classes = _yoloe_class_input()
-        if not world_classes:
-            return
-
-    model = get_model_for_task(task, world_classes, model_name=selected_model)
+    model = get_model_for_task(task, model_name=selected_model)
     if model is None:
         return
 
@@ -179,7 +156,7 @@ def render(task: str, confidence: float, selected_model: str | None = None) -> N
         key="skip_frames",
     )
 
-    # Dispatch — pass task, world_classes & selected_model for multi-video isolation
+    # Dispatch — pass task & selected_model for multi-video model isolation
     _SOURCE_HANDLERS[source](
         model,
         confidence,
@@ -187,53 +164,8 @@ def render(task: str, confidence: float, selected_model: str | None = None) -> N
         tracker,
         skip_frames,
         task,
-        world_classes,
         selected_model,
     )
-
-
-# ── YOLOE helpers ────────────────────────────────────────────────────────────
-
-
-def _yoloe_class_input() -> list[str] | None:
-    """Show a text-area for category-level object classes (YOLOE)."""
-    st.markdown(
-        "💡 **Tip**: YOLOE supports **category-level** labels like `person`, `car`, `dog`. "
-        "It does **NOT** support descriptive phrases like *person in red shirt*. "
-        "Results include both bounding boxes **and** segmentation masks."
-    )
-    text = st.text_area(
-        "🔍 Enter object categories to detect & segment in video (comma-separated)",
-        value=config.DEFAULT_YOLOE_CLASSES,
-        help="YOLOE will search for these object categories in every frame and produce segmentation masks.",
-    )
-    classes = [c.strip() for c in text.split(",") if c.strip()]
-    if classes:
-        st.info(f"🎯 Detecting & segmenting: **{', '.join(classes)}**")
-    else:
-        st.warning("⚠️ Enter at least one object category.")
-    return classes or None
-
-
-# ── YOLO World helpers ───────────────────────────────────────────────────────
-
-
-def _world_class_input() -> list[str] | None:
-    st.markdown(
-        "💡 **Tip**: YOLO World v2 supports natural language! "
-        "Try `person in black`, `red car`, `man with backpack`."
-    )
-    text = st.text_area(
-        "🔍 Enter object classes or descriptions to search in video (comma-separated)",
-        value=config.DEFAULT_WORLD_CLASSES,
-        help="YOLO World v2 will search for these objects/descriptions in every frame.",
-    )
-    classes = [c.strip() for c in text.split(",") if c.strip()]
-    if classes:
-        st.info(f"🎯 Searching: **{', '.join(classes)}**")
-    else:
-        st.warning("⚠️ Enter at least one class.")
-    return classes or None
 
 
 # ── Tracking config ──────────────────────────────────────────────────────────
@@ -512,7 +444,6 @@ def _run_multi_video_loop(
     tracker: str | None,
     skip_frames: int,
     task: str,
-    world_classes: list[str] | None,
     selected_model: str | None = None,
 ) -> None:
     """Process multiple videos simultaneously in side-by-side columns.
@@ -525,7 +456,7 @@ def _run_multi_video_loop(
 
     # Fresh model per video — tracking state isolation
     models = [
-        load_fresh_model(task, world_classes, model_name=selected_model)
+        load_fresh_model(task, model_name=selected_model)
         for _ in range(n)
     ]
 
@@ -621,7 +552,6 @@ def _play_stored_video(
     tracker: str | None,
     skip_frames: int,
     task: str,
-    world_classes: list[str] | None,
     selected_model: str | None = None,
 ) -> None:
     # Scan videos/ on every run so newly added files appear immediately
@@ -671,132 +601,8 @@ def _play_stored_video(
                 tracker,
                 skip_frames,
                 task,
-                world_classes,
                 selected_model,
             )
-
-
-def _play_webcam(
-    model,
-    confidence: float,
-    enable_tracking: bool,
-    tracker: str | None,
-    skip_frames: int,
-    task: str,
-    world_classes: list[str] | None,
-    selected_model: str | None = None,
-) -> None:
-    """Browser-based webcam via streamlit-webrtc (works locally + cloud)."""
-    try:
-        from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
-        import av
-    except ImportError:
-        st.error(
-            "❌ `streamlit-webrtc` is required for webcam access. "
-            "Install it with: `pip install streamlit-webrtc`"
-        )
-        return
-
-    st.info(
-        "📷 Click **START** below to activate your webcam. "
-        "Your browser will ask for camera permission — please allow it."
-    )
-
-    tracked_ids_global: set[int] = set()
-    class_tracked_global: dict[str, set[int]] = defaultdict(set)
-
-    class YOLOVideoProcessor(VideoProcessorBase):
-        def __init__(self):
-            self.frame_count = 0
-            self.last_annotated = None
-
-        def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-            img = frame.to_ndarray(format="bgr24")
-            self.frame_count += 1
-
-            # Skip frames
-            if self.frame_count % skip_frames != 0:
-                if self.last_annotated is not None:
-                    return av.VideoFrame.from_ndarray(
-                        self.last_annotated, format="bgr24"
-                    )
-                return frame
-
-            h_orig, w_orig = img.shape[:2]
-            w = config.VIDEO_DISPLAY_WIDTH
-            h = int(w * h_orig / w_orig)
-            img = cv2.resize(img, (w, h))
-
-            if enable_tracking and tracker:
-                results = model.track(
-                    img, conf=confidence, persist=True, tracker=tracker
-                )
-            else:
-                results = model.predict(img, conf=confidence)
-
-            result = results[0]
-            frame_class_counts: dict[str, int] = {}
-
-            if result.boxes is not None and len(result.boxes):
-                names = result.names
-                classes = result.boxes.cls.cpu().numpy()
-
-                for cls_id in classes:
-                    name = names[int(cls_id)]
-                    frame_class_counts[name] = frame_class_counts.get(name, 0) + 1
-
-                if enable_tracking and result.boxes.id is not None:
-                    ids = result.boxes.id.cpu().numpy()
-                    for track_id, cls_id in zip(ids, classes):
-                        tracked_ids_global.add(int(track_id))
-                        name = names[int(cls_id)]
-                        class_tracked_global.setdefault(name, set()).add(int(track_id))
-
-            annotated = _annotate_with_ids(img, result, enable_tracking)
-            annotated = _draw_overlay(
-                annotated,
-                len(result.boxes) if result.boxes is not None else 0,
-                frame_class_counts,
-                len(tracked_ids_global) if enable_tracking else None,
-                class_tracked_global if enable_tracking else None,
-            )
-            self.last_annotated = annotated
-            return av.VideoFrame.from_ndarray(annotated, format="bgr24")
-
-    webrtc_streamer(
-        key="yolo-webcam",
-        video_processor_factory=YOLOVideoProcessor,
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True,
-    )
-
-
-def _play_rtsp(
-    model,
-    confidence: float,
-    enable_tracking: bool,
-    tracker: str | None,
-    skip_frames: int,
-    task: str,
-    world_classes: list[str] | None,
-    selected_model: str | None = None,
-) -> None:
-    url = st.sidebar.text_input(
-        "RTSP Stream URL",
-        placeholder="rtsp://admin:12345@192.168.1.210:554/Streaming/Channels/101",
-    )
-    if st.sidebar.button("🚀 Start RTSP Stream", type="primary"):
-        if not url:
-            st.sidebar.error("Please enter an RTSP URL.")
-            return
-        _run_video_loop(
-            cv2.VideoCapture(url),
-            model,
-            confidence,
-            enable_tracking,
-            tracker,
-            skip_frames,
-        )
 
 
 def _play_youtube(
@@ -806,7 +612,6 @@ def _play_youtube(
     tracker: str | None,
     skip_frames: int,
     task: str,
-    world_classes: list[str] | None,
     selected_model: str | None = None,
 ) -> None:
     url = st.sidebar.text_input(
@@ -833,7 +638,7 @@ def _play_youtube(
 
 
 def _get_youtube_stream(youtube_url: str) -> str:
-    ydl_opts = {"format": "best[ext=mp4]", "no_warnings": True, "quiet": True}
+    ydl_opts = {"format": "best[ext=mp4]/best", "no_warnings": True, "quiet": True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
         return info["url"]
@@ -842,7 +647,5 @@ def _get_youtube_stream(youtube_url: str) -> str:
 # ── Handler dispatch table ───────────────────────────────────────────────────
 _SOURCE_HANDLERS = {
     config.SOURCE_STORED: _play_stored_video,
-    config.SOURCE_WEBCAM: _play_webcam,
-    config.SOURCE_RTSP: _play_rtsp,
     config.SOURCE_YOUTUBE: _play_youtube,
 }

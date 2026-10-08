@@ -1,8 +1,8 @@
 """
-YOLO Vision Studio — Main Application
-======================================
-Real-time Object Detection, Segmentation, Pose Estimation & Tracking
-powered by YOLO26, YOLO World v2 and Streamlit.
+Vehicle Detection & Tracking — Main Application
+================================================
+Object detection and multi-object tracking for 6 vehicle classes,
+powered by a custom fine-tuned YOLO11n model and Streamlit.
 """
 
 import streamlit as st
@@ -38,7 +38,7 @@ with st.sidebar:
         "🧠 Model",
         options=list(catalog.keys()),
         index=0,
-        help="YOLO26 = fast CNN · RT-DETR = transformer (better on small objects) · World = open-vocab.",
+        help="Custom Indian Vehicle Detector (fine-tuned YOLO11n) or a general COCO model.",
         key="model_select",
     )
     selected_model = catalog[model_label]
